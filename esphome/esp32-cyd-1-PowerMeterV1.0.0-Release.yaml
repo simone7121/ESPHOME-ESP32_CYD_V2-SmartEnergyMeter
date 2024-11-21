@@ -1,0 +1,615 @@
+# ========================================================================================
+#           Configurazione avanzata per il display ESP32-2432S028R su ESPHome
+#                     Versione 1.0.0 - Sviluppata da Simone7121
+# ========================================================================================
+#     Questo file YAML è progettato per integrare l'ESP32 con un display TFT 
+#     e Home Assistant, visualizzando in tempo reale dati provenienti da un 
+#     inverter solare. La configurazione include il controllo della retroilluminazione, 
+#     LED RGB, sensori di produzione e consumo energetico, e grafici interattivi.
+#
+#       - Creato per offrire una soluzione intuitiva e altamente personalizzabile
+#       - Ottimizzato per il monitoraggio dell'energia solare
+#       - Compatibile con dispositivi touch e display grafici LVGL
+#
+#                                   (*)
+#
+#                   Sviluppato con passione da Simone7121
+#       Per ulteriori informazioni o supporto, contattami su www.simonedanna.it !
+# ========================================================================================
+
+
+# ============================================================ 
+#                 Standard ESPHome setup
+# ============================()==============================
+
+# Sostituzioni: semplifica la configurazione con variabili riutilizzabili
+substitutions:
+  device_name: yellowtft1  # Nome del dispositivo, usato nei riferimenti Home Assistant
+  friendly_name: Yellow TFT 1  # Nome amichevole mostrato in Home Assistant
+
+# ESPHome naming
+esphome:
+  name: $device_name
+  friendly_name: $friendly_name
+  on_boot:
+  - delay: 5s
+#  - lvgl.widget.hide: boot_screen
+
+# Immagini da utilizzare per le icone e lo schermo
+image:
+  - file: https://esphome.io/_static/favicon-512x512.png
+    id: boot_logo             # Logo iniziale
+    resize: 200x200
+    type: RGB565
+    use_transparency: true    # Usa trasparenza per sfondo chiaro
+
+  - file: mdi:transmission-tower-export
+    id: prelievo_icon         # Icona per prelievo rete
+    resize: 30x30
+
+  - file: mdi:transmission-tower-import
+    id: immissione_icon       # Icona per immissione rete
+    resize: 30x30
+
+  - file: mdi:home-lightning-bolt-outline
+    id: home_pow_icon         # Icona per consumo casa
+    resize: 30x30
+
+  - file: mdi:solar-panel
+    id: produzione_icon       # Icona per produzione solare
+    resize: 30x30
+
+  - file: mdi:battery
+    id: accumulo_icon         # Icona per batteria
+    resize: 30x30
+
+# Configurazione hardware del microcontrollore ESP32
+esp32:
+  board: esp32dev             # Scheda utilizzata
+  framework:
+    type: arduino             # Tipo di framework per la programmazione
+
+# Abilita il logging per debug
+logger:
+
+# Configurazione API per comunicare con Home Assistant
+api:
+  encryption:
+    key: !secret homeassistant_key # CHIAVE DI CIFRATURA HOMEASSISTANT
+  on_client_connected:
+    - if:
+        condition:
+          lambda: 'return (0 == client_info.find("Home Assistant "));'
+        then:
+          - lvgl.widget.show: lbl_hastatus            # Mostra lo stato del client connesso
+  on_client_disconnected:
+    - if:
+        condition:
+          lambda: 'return (0 == client_info.find("Home Assistant "));'
+        then:
+          - lvgl.widget.hide: lbl_hastatus            # Nasconde lo stato del client
+
+# Configurazione OTA (Over-The-Air) per aggiornamenti software
+ota:
+  platform: esphome
+  password: !secret ota_password    # Password x OTA Upgrade
+
+# Configurazione Wi-Fi
+wifi:
+  ssid: !secret wifi_ssid           # SSID del Wi-Fi (Segreto)
+  password: !secret wifi_password   # Password del Wi-Fi (Segreto)
+  ap:
+    ssid: $device_name WiFi         # SSID dell'Hotspot (Fallback)
+    password: "1234567890"          # Password dell'Hotspot (Fallback)
+
+# CAPITE PORTAL per gestione connessione fallback
+captive_portal:
+# ============================()=============================== 
+
+
+# ============================================================ 
+#               Home Assistant related setup
+# ============================()===============================
+
+# Setta le entita' di luce da esporre nell integrazione di HA
+light:
+  - platform: monochromatic   # Monocromatica
+    output: backlight_pwm
+    name: Display Backlight   # Controlla la retroilluminazione
+    id: backlight
+    restore_mode: ALWAYS_ON   # Mantieni Sempre Acceso
+  
+  - platform: rgb             # Set up the LED on the back 
+    name: LED
+    id: led
+    red: output_red
+    green: output_green
+    blue: output_blue
+    restore_mode: ALWAYS_OFF  # Mantieni Sempre Spento
+# ============================()=============================== 
+
+
+# ============================================================ 
+#                  Hardware related setup                     
+# ============================()============================== 
+
+# Configurazione del bus SPI per il display e il touchscreen
+# (The ESP32-2432S028R uses separate SPI buses for display and touch)
+spi:
+  - id: tft                 # SPI x Lo Schemro TFT
+    clk_pin: GPIO14
+    mosi_pin: GPIO13
+    miso_pin: GPIO12
+
+  - id: touch               # SPI x Il Touch Controller
+    clk_pin: GPIO25
+    mosi_pin: GPIO32
+    miso_pin: GPIO39
+
+# Configurazione delle uscite per retroilluminazione e LED
+output:
+  - platform: ledc
+    pin: GPIO21             # Pin Per Retroilluminazione LCD
+    id: backlight_pwm
+
+  - platform: ledc
+    id: output_red
+    pin: GPIO4              # Pin Per Rosso
+    inverted: true
+
+  - platform: ledc
+    id: output_green
+    pin: GPIO16             # Pin Per Verde
+    inverted: true
+
+  - platform: ledc
+    id: output_blue
+    pin: GPIO17             # Pin Per Blu
+    inverted: true
+
+# Setup the ili9xxx platform
+# Display is used as 240x320 by default so we rotate it to 0°
+display:
+  - platform: ili9xxx
+    model: ILI9341
+    id: yellow_screen
+    spi_id: tft
+    cs_pin: GPIO15
+    dc_pin: GPIO2
+    rotation: 0             # Rotazione Display
+    dimensions:             # Dimensione Display
+      height: 240
+      width: 320
+    invert_colors: false
+    auto_clear_enabled: false
+    update_interval: never
+    color_order: rgb        # ATTENZIONE SOLO Se vedi i colori sfasati cambia da bgr a rgb
+
+# Configurazione del touchscreen
+touchscreen:
+  - platform: xpt2046
+    id: yellow_touchscreen
+    spi_id: touch
+    cs_pin: GPIO33
+    interrupt_pin: GPIO36
+    update_interval: 50ms
+    threshold: 400
+    calibration:
+      x_min: 300
+      x_max: 3900
+      y_min: 200
+      y_max: 3700
+    transform:
+      swap_xy: true
+      mirror_x: true
+      mirror_y: true
+# ============================()=============================== 
+
+
+# ============================================================ 
+#               LGVL Display related setup
+# ============================()=============================== 
+
+# Font personalizzato per icone batteria (Material Design Icons)
+font:
+  - file: "fonts/materialdesignicons-webfont.ttf"
+    id: battery_icons_30
+    size: 30                # Dimensione del font in punti
+    bpp: 4                  # Bits per pixel per una maggiore qualità
+    glyphs: [               # Icone batteria utilizzate
+      "\U000F007A",     # mdi-battery-10
+      "\U000F007B",     # mdi-battery-20
+      "\U000F007C",     # mdi-battery-30
+      "\U000F007D",     # mdi-battery-40
+      "\U000F007E",     # mdi-battery-50
+      "\U000F007F",     # mdi-battery-60
+      "\U000F0080",     # mdi-battery-70
+      "\U000F0081",     # mdi-battery-80
+      "\U000F0082",     # mdi-battery-90
+      "\U000F0079",     # mdi-battery (full)
+      "\U000F008E",     # mdi-battery-outline
+      "\U000F0091",     # mdi-battery-unknown
+    ]
+
+
+# Configurazione LVGL per temi e stili personalizzati
+lvgl:
+  theme:
+    label:
+      text_font: montserrat_16  # Font personalizzato per tutte le etichette
+    button:
+      bg_color: 0x2F8CD8        # Colore di sfondo del bottone
+      bg_grad_color: 0x005782   # Gradiente sfondo
+      bg_grad_dir: VER          # Direzione gradiente verticale
+      bg_opa: COVER             # Opacità sfondo al 100%
+      border_color: 0x0077b3    # Colore del bordo
+      border_width: 1           # Spessore del bordo
+      text_color: 0xFFFFFF      # Colore del testo
+      pressed:                  # Stile bottone premuto
+        bg_color: 0x006699
+        bg_grad_color: 0x00334d
+      checked:                  # Stile bottone selezionato
+        bg_color: 0x1d5f96
+        bg_grad_color: 0x03324A
+        text_color: 0xfff300
+    buttonmatrix:
+      bg_opa: TRANSP            # Sfondo trasparente
+      border_color: 0x0077b3
+      border_width: 0
+      text_color: 0xFFFFFF
+      pad_all: 0                # Nessun padding
+      items:                    # Stile pulsanti in matrice
+        bg_color: 0x2F8CD8
+        bg_grad_color: 0x005782
+        bg_grad_dir: VER
+        bg_opa: COVER
+        border_color: 0x0077b3
+        border_width: 1
+        text_color: 0xFFFFFF
+        text_font: montserrat_16  # Font pulsanti
+        pressed:
+          bg_color: 0x006699
+          bg_grad_color: 0x00334d
+        checked:
+          bg_color: 0x1d5f96
+          bg_grad_color: 0x03324A
+          text_color: 0x005580
+    switch:
+      bg_color: 0xC0C0C0        # Colore base switch
+      bg_grad_color: 0xb0b0b0   # Gradiente sfondo
+      bg_grad_dir: VER
+      bg_opa: COVER
+      checked:                  # Stile switch attivo
+        bg_color: 0x1d5f96
+        bg_grad_color: 0x03324A
+      knob:                     # Stile della manopola
+        bg_color: 0xFFFFFF
+        bg_grad_color: 0xC0C0C0
+        bg_grad_dir: VER
+        bg_opa: COVER
+    slider:
+      border_width: 1
+      border_opa: 15%           # Opacità bordo
+      bg_color: 0xcccaca        # Colore base slider
+      bg_opa: 15%
+      indicator:                # Indicatore valore slider
+        bg_color: 0x1d5f96
+        bg_grad_color: 0x03324A
+        bg_grad_dir: VER
+        bg_opa: COVER
+      knob:                     # Manopola slider
+        bg_color: 0x2F8CD8
+        bg_grad_color: 0x005782
+        bg_grad_dir: VER
+        bg_opa: COVER
+        border_color: 0x0077b3
+        border_width: 1
+        text_color: 0xFFFFFF
+
+  style_definitions:
+    - id: header_footer
+      bg_color: 0x2F8CD8                               # Colore di sfondo intestazione/piedipagina
+      bg_grad_color: 0x005782
+      bg_grad_dir: VER
+      bg_opa: COVER
+      border_opa: TRANSP
+      radius: 0                                        # Angoli quadrati
+      pad_all: 0
+      pad_row: 0
+      pad_column: 0
+      border_color: 0x0077b3                           # Colore del bordo
+      text_color: 0xFFFFFF                             # Colore testo
+      width: 100%                                      # Larghezza piena
+      height: 30                                       # Altezza fissa
+
+  top_layer:
+    widgets:
+      - buttonmatrix:                                  # Menu di navigazione nella parte inferiore dello schermo
+          align: bottom_mid                            # Posizionato al centro in basso
+          styles: header_footer                        # Stile definito per l'intestazione/piedipagina
+          pad_all: 0                                   # Nessun padding
+          outline_width: 0                             # Larghezza del contorno
+          id: top_layer
+          items:                                       # Elementi del menu
+            styles: header_footer
+          rows:                                        # Configurazione dei pulsanti
+            - buttons:
+              - id: page_prev                          # Pulsante pagina precedente
+                text: "\uF053"                         # Icona per pagina precedente
+                on_press:
+                  then:
+                    lvgl.page.previous:                # Azione per mostrare la pagina precedente
+              - id: page_home                          # Pulsante per la pagina principale
+                text: "\uF015"                         # Icona per home
+                on_press:
+                  then:
+                    lvgl.page.show: main_page          # Azione per mostrare la pagina principale
+              - id: page_next                          # Pulsante pagina successiva
+                text: "\uF054"                         # Icona per pagina successiva
+                on_press:
+                  then:
+                    lvgl.page.next:                    # Azione per mostrare la pagina successiva
+      - label:                                         # Etichetta per lo stato del client
+          text: "\uF1EB"                               # Icona per lo stato
+          id: lbl_hastatus
+          hidden: true                                 # Inizialmente nascosto
+          align: bottom_mid                            # Allineamento al centro in basso
+          x: -30                                       # Offset orizzontale
+          y: -8                                        # Offset verticale
+          text_align: center                           # Testo centrato
+          text_color: 0xFFFFFF                         # Colore bianco
+
+  pages:
+    - id: main_page                                    # Pagina principale
+      widgets:
+
+        # Produzione Solare (In Alto a SX)
+        - label:                                       # Etichetta per Produzione Solare
+            text: "Solare"
+            x: 10                                      # Posizione orizzontale
+            y: 10                                      # Posizione verticale
+            text_color: orange                         # Colore arancione
+            text_font: montserrat_20                   # Font dimensione 20
+        - label:                                       # Valore della produzione solare
+            id: produzione_value
+            text: ".... W"
+            x: 10
+            y: 40
+            text_font: montserrat_16                   # Font dimensione 16
+        - image:                                       # Icona per produzione solare
+            id: produzione_image
+            src: produzione_icon
+            x: 120
+            y: 10
+        - bar:                                         # Grafico della produzione solare
+            id: produzione_bar
+            x: 10
+            y: 70
+            width: 140                                 # Larghezza barra
+            height: 20                                 # Altezza barra
+            min_value: 0                               # Valore minimo
+            max_value: 5000                            # Valore massimo
+            bg_color: orange                           # Colore sfondo arancione
+
+        # Consumo RETE ENEL (In Alto a DX)
+        - label:                                       # Etichetta per Rete
+            text: "Rete"
+            x: 170
+            y: 10
+            text_color: blue                           # Colore blu
+            text_font: montserrat_20
+        - label:                                       # Valore di rete
+            id: grid_value
+            text: ".... W"
+            x: 170
+            y: 40
+            text_font: montserrat_16
+        - image:                                       # Icona per immissione/prelievo rete
+            id: grid_image
+            src: immissione_icon
+            x: 280
+            y: 10
+        - bar:                                         # Grafico rete
+            id: grid_bar
+            x: 170
+            y: 70
+            width: 140
+            height: 20
+            min_value: -5000                           # Valore minimo (negativo per prelievo)
+            max_value: 5000                            # Valore massimo (positivo per immissione)
+            bg_color: blue                             # Colore blu
+
+        # Consumo Casa (In Basso a SX)
+        - label:                                       # Etichetta per Consumo Casa
+            text: "Casa"
+            x: 10
+            y: 110
+            text_color: red                            # Colore rosso
+            text_font: montserrat_20
+        - label:                                       # Valore consumo casa
+            id: user_value
+            text: ".... W"
+            x: 10
+            y: 140
+            text_font: montserrat_16
+        - image:                                       # Icona per consumo casa
+            id: user_image
+            src: home_pow_icon
+            x: 120
+            y: 110
+        - bar:                                         # Grafico consumo casa
+            id: user_bar
+            x: 10
+            y: 170
+            width: 140
+            height: 20
+            min_value: 0                               # Valore minimo
+            max_value: 5000                            # Valore massimo
+            bg_color: red                              # Colore rosso
+
+        # Batteria (In Basso a DX)
+        - label:                                      # Etichetta per Batteria
+            text: "Batteria"
+            x: 170
+            y: 110
+            text_color: green
+            text_font: montserrat_20                   # Font dimensione 20
+        - label:                                       # Valore della batteria
+            id: accumulo_value
+            text: ".... W"
+            x: 170
+            y: 140
+            text_font: montserrat_16                   # Font dimensione 16
+        - label:                                       # Icona batteria dinamica
+            id: accumulo_image
+            text_font: battery_icons_30                # Font per icone batteria
+            text_color: orange                         # Colore icona arancione
+            text: "\U000F0091"                         # Icona iniziale (mdi-battery-unknown)
+            x: 280
+            y: 110
+        - bar:                                         # Grafico stato batteria
+            id: accumulo_bar
+            x: 170
+            y: 170
+            width: 140                                 # Larghezza barra
+            height: 20                                 # Altezza barra
+            min_value: -5000                           # Valore minimo (scarica)
+            max_value: 5000                            # Valore massimo (ricarica)
+            bg_color: green                            # Colore verde
+
+    - id: sub1_page                                    # Seconda pagina
+      widgets:
+        - label:                                       # Messaggio di test sulla seconda pagina
+            text: "CIAO"
+            x: 10
+            y: 10
+            text_color: orange                         # Colore arancione
+            text_font: montserrat_20                   # Font dimensione 20
+
+  buffer_size: 0.6                                     # Dimensione buffer per rendering (NON CAMBIARLO ASSOLUTAMENTE SENNO VA IN CRASH X SHORTAGE PSRAM)
+
+# ============================()=============================== 
+
+
+# ============================================================ 
+#               Home Assistant Sensor Probing
+# ============================()===============================
+
+# Sensori configurati tramite Home Assistant
+sensor:
+
+  - platform: homeassistant                             # Sensore di produzione solare
+    id: sensor_produzione
+    entity_id: sensor.inverter_fotovoltaico_instant_solar_power
+    on_value:
+      - lvgl.label.update:                              # Aggiorna etichetta Produzione Solare
+          id: produzione_value
+          text: !lambda 'return ("+" + String((int)id(sensor_produzione).state) + " W").c_str();'
+      - lvgl.bar.update:                                # Aggiorna barra Produzione Solare
+          id: produzione_bar
+          value: !lambda 'return (int)id(sensor_produzione).state;'
+
+  - platform: homeassistant                             # Sensore per immissione/prelievo dalla rete
+    id: sensor_grid
+    entity_id: sensor.inverter_fotovoltaico_instant_grid_power
+    on_value:
+      - lvgl.label.update:                              # Aggiorna etichetta Rete
+          id: grid_value
+          text: !lambda |-
+            auto gr_value = id(sensor_grid).state;
+            if (gr_value > 0) {
+              return ("+" + String((int)gr_value) + " W (Guad $)").c_str();
+            } else if (gr_value == 0){
+              return ("~" + String("0 W (Stand-By)")).c_str();
+            } else {
+              return (String((int)gr_value) + " W ($ Comp)").c_str();
+            }
+      - lvgl.bar.update:                                # Aggiorna barra Rete
+          id: grid_bar
+          value: !lambda 'return (int)id(sensor_grid).state;'
+
+  - platform: homeassistant                             # Sensore di consumo casa
+    id: sensor_user
+    entity_id: sensor.inverter_fotovoltaico_instant_user_power
+    on_value:
+      - lvgl.label.update:                              # Aggiorna etichetta Consumo Casa
+          id: user_value
+          text: !lambda 'return ("-" + String((int)id(sensor_user).state) + " W").c_str();'
+      - lvgl.bar.update:                                # Aggiorna barra Consumo Casa
+          id: user_bar
+          value: !lambda 'return (int)id(sensor_user).state;'
+
+  - platform: homeassistant                             # Sensore di accumulo batteria
+    id: sensor_accumulo
+    entity_id: sensor.inverter_fotovoltaico_instant_battery_power
+    on_value:
+      - lvgl.label.update:                              # Aggiorna etichetta Batteria
+          id: accumulo_value
+          text: !lambda |-
+            auto acc_value = id(sensor_accumulo).state;
+            if (acc_value > 0) {
+              return ("+" + String((int)acc_value) + " W (Ricar)").c_str();
+            } else if (acc_value == 0){
+              return ("~" + String("0 W (Stand-By)")).c_str();
+            } else {
+              return (String((int)acc_value) + " W (Scaric)").c_str();
+            }
+      - lvgl.bar.update:                                # Aggiorna barra Batteria
+          id: accumulo_bar
+          value: !lambda 'return (int)id(sensor_accumulo).state;'
+
+  - platform: homeassistant                             # Percentuale di carica batteria
+    id: solare_battery_percentage
+    entity_id: sensor.inverter_fotovoltaico_battery_level
+    on_value:
+      - lvgl.label.update:                              # Aggiorna icona batteria
+          id: accumulo_image
+          text: !lambda |-
+            static char buf[10];
+            std::string icon;
+            int x = (int)id(solare_battery_percentage).state;
+            if (x == 100) {
+              icon = "\U000F0079";                      // mdi-battery (full)
+            } else if (x > 90) {
+              icon = "\U000F0082";                      // mdi-battery-90
+            } else if (x > 80) {
+              icon = "\U000F0081";                      // mdi-battery-80
+            } else if (x > 70) {
+              icon = "\U000F0080";                      // mdi-battery-70
+            } else if (x > 60) {
+              icon = "\U000F007F";                      // mdi-battery-60
+            } else if (x > 50) {
+              icon = "\U000F007E";                      // mdi-battery-50
+            } else if (x > 40) {
+              icon = "\U000F007D";                      // mdi-battery-40
+            } else if (x > 30) {
+              icon = "\U000F007C";                      // mdi-battery-30
+            } else if (x > 20) {
+              icon = "\U000F007B";                      // mdi-battery-20
+            } else if (x > 10) {
+              icon = "\U000F007A";                      // mdi-battery-10
+            } else if (x > 0) {
+              icon = "\U000F008E";                      // mdi-battery-outline
+            } else {
+              icon = "\U000F0091";                      // mdi-battery-unknown
+            }
+            snprintf(buf, sizeof(buf), "%s", icon.c_str());
+            return buf;
+
+      - lvgl.label.update:                              # Aggiorna colore dell'icona in base alla carica
+          id: accumulo_image
+          text_color: !lambda |-
+            int r = 0, g = 0, b = 0;
+            int x = (int)id(solare_battery_percentage).state;
+            if (x < 50) {
+              r = 255;                                  // Rosso aumenta sotto il 50%
+              g = (int)(5.1 * x);                       // Verde proporzionale alla carica
+            } else {
+              g = 255;                                  // Verde massimo sopra il 50%
+              r = (int)(510 - 5.1 * x);                 // Rosso diminuisce sopra il 50%
+            }
+            lv_color_t color = lv_color_make(r, g, b);  // Converte in colore LVGL
+            return color;
+
+# ============================()=============================== 
+
