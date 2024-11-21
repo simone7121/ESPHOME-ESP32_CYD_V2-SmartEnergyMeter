@@ -1,6 +1,6 @@
 # ESPHOME-ESP32_CYD_V2-SmartEnergyMeter Solar Monitor Configuration
 
-[20241121_190408](https://github.com/user-attachments/assets/98b5d0d1-35e8-4e53-99f0-1f9d7d111d01)
+![20241121_190408](https://github.com/user-attachments/assets/98b5d0d1-35e8-4e53-99f0-1f9d7d111d01)
 
 ## Descrizione
 
