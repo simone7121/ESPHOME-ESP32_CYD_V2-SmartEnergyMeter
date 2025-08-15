@@ -2,9 +2,9 @@
 #           Configurazione avanzata per il display ESP32-2432S028R su ESPHome
 #                     Versione 1.0.0 - Sviluppata da Simone7121
 # ========================================================================================
-#     Questo file YAML è progettato per integrare l'ESP32 con un display TFT 
-#     e Home Assistant, visualizzando in tempo reale dati provenienti da un 
-#     inverter solare. La configurazione include il controllo della retroilluminazione, 
+#     Questo file YAML è progettato per integrare l'ESP32 con un display TFT
+#     e Home Assistant, visualizzando in tempo reale dati provenienti da un
+#     inverter solare. La configurazione include il controllo della retroilluminazione,
 #     LED RGB, sensori di produzione e consumo energetico, e grafici interattivi.
 #
 #       - Creato per offrire una soluzione intuitiva e altamente personalizzabile
@@ -18,7 +18,7 @@
 # ========================================================================================
 
 
-# ============================================================ 
+# ============================================================
 #                 Standard ESPHome setup
 # ============================()==============================
 
@@ -37,11 +37,14 @@ esphome:
 
 # Immagini da utilizzare per le icone e lo schermo
 image:
+  defaults:
+    type: rgb565
+  images:
   - file: https://esphome.io/_static/favicon-512x512.png
     id: boot_logo             # Logo iniziale
     resize: 200x200
     type: RGB565
-    use_transparency: true    # Usa trasparenza per sfondo chiaro
+    transparency: alpha_channel    # Usa trasparenza per sfondo chiaro
 
   - file: mdi:transmission-tower-export
     id: prelievo_icon         # Icona per prelievo rete
@@ -104,10 +107,10 @@ wifi:
 
 # CAPITE PORTAL per gestione connessione fallback
 captive_portal:
-# ============================()=============================== 
+# ============================()===============================
 
 
-# ============================================================ 
+# ============================================================
 #               Home Assistant related setup
 # ============================()===============================
 
@@ -118,20 +121,20 @@ light:
     name: Display Backlight   # Controlla la retroilluminazione
     id: backlight
     restore_mode: ALWAYS_ON   # Mantieni Sempre Acceso
-  
-  - platform: rgb             # Set up the LED on the back 
+
+  - platform: rgb             # Set up the LED on the back
     name: LED
     id: led
     red: output_red
     green: output_green
     blue: output_blue
     restore_mode: ALWAYS_OFF  # Mantieni Sempre Spento
-# ============================()=============================== 
+# ============================()===============================
 
 
-# ============================================================ 
-#                  Hardware related setup                     
-# ============================()============================== 
+# ============================================================
+#                  Hardware related setup
+# ============================()==============================
 
 # Configurazione del bus SPI per il display e il touchscreen
 # (The ESP32-2432S028R uses separate SPI buses for display and touch)
@@ -176,6 +179,7 @@ display:
     spi_id: tft
     cs_pin: GPIO15
     dc_pin: GPIO2
+    # color_palette: 8BIT
     rotation: 0             # Rotazione Display
     dimensions:             # Dimensione Display
       height: 240
@@ -203,12 +207,12 @@ touchscreen:
       swap_xy: true
       mirror_x: true
       mirror_y: true
-# ============================()=============================== 
+# ============================()===============================
 
 
-# ============================================================ 
+# ============================================================
 #               LGVL Display related setup
-# ============================()=============================== 
+# ============================()===============================
 
 # Font personalizzato per icone batteria (Material Design Icons)
 font:
@@ -488,10 +492,10 @@ lvgl:
 
   buffer_size: 0.6                                     # Dimensione buffer per rendering (NON CAMBIARLO ASSOLUTAMENTE SENNO VA IN CRASH X SHORTAGE PSRAM)
 
-# ============================()=============================== 
+# ============================()===============================
 
 
-# ============================================================ 
+# ============================================================
 #               Home Assistant Sensor Probing
 # ============================()===============================
 
@@ -611,5 +615,5 @@ sensor:
             lv_color_t color = lv_color_make(r, g, b);  // Converte in colore LVGL
             return color;
 
-# ============================()=============================== 
+# ============================()===============================
 
