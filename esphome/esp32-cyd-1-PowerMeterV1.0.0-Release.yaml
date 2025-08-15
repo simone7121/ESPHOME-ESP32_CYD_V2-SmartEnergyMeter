@@ -1,6 +1,6 @@
 # ========================================================================================
 #           Configurazione avanzata per il display ESP32-2432S028R su ESPHome
-#                     Versione 1.0.0 - Sviluppata da Simone7121
+#                     Versione 1.0.1 - Sviluppata da Simone7121
 # ========================================================================================
 #     Questo file YAML è progettato per integrare l'ESP32 con un display TFT
 #     e Home Assistant, visualizzando in tempo reale dati provenienti da un
